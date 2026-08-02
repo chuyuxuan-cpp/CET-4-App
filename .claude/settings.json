@@ -3,6 +3,10 @@
     "Stop": [
       {
         "matcher": "",
+        "command": "powershell -c \"cd 'E:\\CET-4 App'; git add -A; if (git diff --cached --quiet) { exit 0 }; git commit -m 'Auto: snapshot after code changes'; git push\""
+      },
+      {
+        "matcher": "",
         "command": "powershell -c \"[System.Media.SystemSounds]::Hand.Play()\""
       }
     ]
