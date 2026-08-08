@@ -17,7 +17,9 @@
 
 - 开发者有 Python 经验，无 iOS/移动端开发经验
 - 开发环境为 Windows，无 Mac；iPhone 真机
-- 因此：Flutter 跨平台，Windows + Android 模拟器完成全部开发，Codemagic（或 GitHub Actions macOS runner）云端构建 iOS 包，Sideloadly 侧载到 iPhone 做阶段性真机验证；上架前再考虑购入 Mac
+- 首要目标：开发者本人先在 iPhone 13 上用起来，后续再考虑推广
+- 因此：Flutter 跨平台，Windows + Android 模拟器完成全部开发；GitHub Actions macOS runner（公开仓库免费）云端构建未签名 IPA，AltStore + 免费 Apple ID 侧载到 iPhone 并自动续签（同 WiFi 下 AltServer 后台续期），零成本
+- iPhone 真机验证是**第一里程碑**：骨架 App 先上真机打通链路，再逐模块开发；上架前再考虑购入 Mac
 
 ## 技术选型
 
@@ -152,7 +154,7 @@ stage=99 后不再出现在自出卷
 2. 复习引擎 + 自出卷模块
 3. 生词本模块 + 专项自测
 4. 设置模块 + 每日提醒 + 收尾打磨
-5. Codemagic 云端构建 iOS 包，Sideloadly 真机验证
+5. 每完成一个模块即通过 GitHub Actions 出新 IPA，AltStore 安装到 iPhone 13 验证
 
 ## 词库来源
 

@@ -1,0 +1,47 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/Release-iphoneos/Runner.app Payload/
+          zip -r CET4App.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CET4App-iOS-unsigned
+          path: CET4App.ipa
+          retention-days: 30
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: |
+            build/ios/Release-iphoneos/Runner.app/Info.plist

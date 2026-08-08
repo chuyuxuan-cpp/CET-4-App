@@ -1,0 +1,52 @@
+name: cet4_app
+description: "CET-4/6 Vocabulary Learning App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Database
+  drift: ^2.24.0
+  sqlite3_flutter_libs: ^0.5.30
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # TTS
+  flutter_tts: ^4.2.2
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+
+  # Utilities
+  intl: ^0.20.2
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Code generation
+  drift_dev: ^2.24.0
+  build_runner: ^2.4.14
+  riverpod_generator: ^2.6.3
+  freezed: ^2.5.8
+  json_serializable: ^6.9.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/cet4.db
