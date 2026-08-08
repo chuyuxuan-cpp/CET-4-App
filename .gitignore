@@ -51,4 +51,6 @@ Driver_Notes/
 msedgedriver.exe
 fix-claude-shims.ps1
 docx_content.txt
+.env
 *.output
+example_checkpoint.txt
