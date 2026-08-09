@@ -98,31 +98,75 @@ def create_database(cet4_entries: list[dict], cet6_entries: list[dict]):
     """创建 SQLite 数据库并写入词条。"""
     os.makedirs(ASSETS_DIR, exist_ok=True)
 
-    # 删除旧文件
+    existing_examples = {}
     if os.path.exists(DB_PATH):
+        previous = sqlite3.connect(DB_PATH)
+        try:
+            existing_examples = {
+                (word.lower(), book): example
+                for word, book, example in previous.execute(
+                    "SELECT word, book, example FROM words WHERE example IS NOT NULL AND example != ''"
+                )
+            }
+        finally:
+            previous.close()
         os.remove(DB_PATH)
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    c.execute('''
+    # Keep the seed database schema identical to AppDatabase so it can be
+    # copied directly to the application's writable Drift database location.
+    c.executescript('''
         CREATE TABLE words (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            word TEXT NOT NULL,
+            word TEXT NOT NULL CHECK (length(word) >= 1 AND length(word) <= 100),
             phonetic TEXT,
             pos TEXT,
             meaning TEXT,
             example TEXT,
-            book TEXT DEFAULT 'cet4',
-            seq INTEGER
-        )
+            book TEXT NOT NULL DEFAULT 'cet4',
+            seq INTEGER NOT NULL
+        );
+
+        CREATE TABLE progress (
+            word_id INTEGER NOT NULL REFERENCES words (id),
+            book TEXT NOT NULL DEFAULT 'cet4',
+            first_learned_at INTEGER,
+            stage INTEGER NOT NULL DEFAULT 1,
+            next_review_at INTEGER,
+            PRIMARY KEY (word_id, book)
+        );
+
+        CREATE TABLE notebook (
+            word_id INTEGER NOT NULL REFERENCES words (id),
+            added_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', CURRENT_TIMESTAMP) AS INTEGER)),
+            source TEXT NOT NULL DEFAULT 'manual',
+            PRIMARY KEY (word_id)
+        );
+
+        CREATE TABLE quiz_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            answered_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', CURRENT_TIMESTAMP) AS INTEGER)),
+            word_id INTEGER NOT NULL REFERENCES words (id),
+            quiz_type TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            correct INTEGER NOT NULL CHECK (correct IN (0, 1))
+        );
+
+        CREATE TABLE settings (
+            key TEXT NOT NULL PRIMARY KEY,
+            value TEXT NOT NULL
+        );
     ''')
 
     all_entries = cet4_entries + cet6_entries
+    for entry in all_entries:
+        entry['example'] = existing_examples.get((entry['word'].lower(), entry['book']))
 
     c.executemany('''
-        INSERT INTO words (word, phonetic, pos, meaning, book, seq)
-        VALUES (:word, :phonetic, :pos, :meaning, :book, :seq)
+        INSERT INTO words (word, phonetic, pos, meaning, example, book, seq)
+        VALUES (:word, :phonetic, :pos, :meaning, :example, :book, :seq)
     ''', all_entries)
 
     # 索引

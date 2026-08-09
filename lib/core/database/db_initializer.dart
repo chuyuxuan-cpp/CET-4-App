@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 /// 将 assets/cet4.db 复制到应用文档目录（首次启动时）
 class DatabaseInitializer {
   static const String _assetDbName = 'assets/cet4.db';
-  static const String _dbFileName = 'cet4_words.db';
+  static const String _dbFileName = 'cet4_user.db';
 
   static Future<String> get databasePath async {
     final dir = await getApplicationDocumentsDirectory();
