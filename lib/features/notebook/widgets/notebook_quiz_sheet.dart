@@ -176,8 +176,7 @@ class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
               color: cs.primary,
             ),
           ),
-          if (widget.question.isEn2Cn &&
-              widget.question.word.pos != null &&
+          if (widget.question.word.pos != null &&
               widget.question.word.pos!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
