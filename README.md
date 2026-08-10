@@ -68,4 +68,4 @@ flutter build ios --release --no-codesign
 
 ## 许可证
 
-请在使用、修改或再分发词表数据前，分别查阅词表来源仓库及本项目的适用许可与说明。
+本项目代码采用 [MIT License](LICENSE)。内置词表来源于 [mahavivo/english-wordlists](https://github.com/mahavivo/english-wordlists)，请在使用、修改或再分发前查阅该词表仓库的适用许可。
