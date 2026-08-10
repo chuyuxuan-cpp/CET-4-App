@@ -177,6 +177,18 @@ class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
             ),
           ),
           if (widget.question.isEn2Cn &&
+              widget.question.word.pos != null &&
+              widget.question.word.pos!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                widget.question.word.pos!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          if (widget.question.isEn2Cn &&
               widget.question.word.phonetic != null &&
               widget.question.word.phonetic!.isNotEmpty)
             Padding(
