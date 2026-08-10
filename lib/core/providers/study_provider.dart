@@ -90,7 +90,8 @@ class StudyState {
 
   bool get hasWords => words.isNotEmpty;
 
-  bool get completed => hasWords && currentIndex >= words.length;
+  /// True when the daily session is concluded (no more words in today's quota).
+  bool get completed => (words.isEmpty && !isLoading) || (hasWords && currentIndex >= words.length);
 
   /// Human-readable progress string, e.g. "3/20".
   String get progress {
@@ -263,11 +264,12 @@ class StudyNotifier extends Notifier<StudyState> {
       final db = await _db;
       if (state.isBookmarked) {
         await db.removeFromNotebook(word.id);
+        state = state.copyWith(isBookmarked: false);
       } else {
         await db.addToNotebook(word.id, 'manual');
+        state = state.copyWith(isBookmarked: true);
       }
       ref.read(appDataEventsProvider.notifier).notebookChanged();
-      _refreshBookmarkStatus();
     } catch (_) {
       state = state.copyWith(errorMessage: '保存失败，请重试');
     }
