@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cet4_app/core/database/database.dart';
+import 'package:cet4_app/core/providers/app_data_events_provider.dart';
 import 'package:cet4_app/core/providers/database_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -155,7 +157,17 @@ class NotebookState {
 
 class NotebookNotifier extends Notifier<NotebookState> {
   @override
-  NotebookState build() => NotebookState.initial();
+  NotebookState build() {
+    ref.listen<int>(
+      appDataEventsProvider.select((value) => value.notebookRevision),
+      (_, int revision) {
+        if (revision > 0 && !state.isQuizMode) {
+          unawaited(loadWords());
+        }
+      },
+    );
+    return NotebookState.initial();
+  }
 
   final _random = Random();
 

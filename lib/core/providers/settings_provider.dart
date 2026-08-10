@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cet4_app/core/database/database.dart';
+import 'package:cet4_app/core/providers/app_data_events_provider.dart';
 import 'package:cet4_app/core/providers/database_provider.dart';
 import 'package:cet4_app/core/services/notification_service.dart';
 
@@ -85,7 +88,17 @@ class SettingsState {
 
 class SettingsNotifier extends Notifier<SettingsState> {
   @override
-  SettingsState build() => SettingsState.initial();
+  SettingsState build() {
+    ref.listen<int>(
+      appDataEventsProvider.select((value) => value.studyRevision),
+      (_, int revision) {
+        if (revision > 0) {
+          unawaited(loadSettings());
+        }
+      },
+    );
+    return SettingsState.initial();
+  }
 
   // -- helpers ----------------------------------------------------------------
 
@@ -140,6 +153,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     try {
       final db = await _db;
       await db.setSetting('daily_quota', quota.toString());
+      ref.read(appDataEventsProvider.notifier).settingsChanged();
     } catch (e) {
       debugPrint('setDailyQuota 失败: $e');
     }
@@ -164,6 +178,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         reviewCount: progressCounts['review'],
         masteredCount: progressCounts['mastered'],
       );
+      ref.read(appDataEventsProvider.notifier).settingsChanged();
     } catch (e) {
       state = state.copyWith(isLoading: false);
       debugPrint('setActiveBook 失败: $e');
@@ -223,6 +238,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
         reviewCount: 0,
         masteredCount: 0,
       );
+      final events = ref.read(appDataEventsProvider.notifier);
+      events.settingsChanged();
+      events.notebookChanged();
     } catch (e) {
       debugPrint('resetCurrentBook 失败: $e');
     }

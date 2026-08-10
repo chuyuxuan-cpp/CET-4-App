@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cet4_app/core/database/database.dart';
+import 'package:cet4_app/core/providers/app_data_events_provider.dart';
 import 'package:cet4_app/core/providers/database_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,9 @@ class StudyState {
   /// Whether the current word is in the notebook (starred).
   final bool isBookmarked;
 
+  /// Whether another extra batch can be loaded from the active book.
+  final bool hasMoreNewWords;
+
   final String? errorMessage;
 
   const StudyState({
@@ -42,6 +46,7 @@ class StudyState {
     required this.isFlipped,
     required this.isLoading,
     required this.isBookmarked,
+    required this.hasMoreNewWords,
     this.errorMessage,
   });
 
@@ -53,6 +58,7 @@ class StudyState {
     isFlipped: false,
     isLoading: true,
     isBookmarked: false,
+    hasMoreNewWords: true,
   );
 
   StudyState copyWith({
@@ -63,6 +69,7 @@ class StudyState {
     bool? isFlipped,
     bool? isLoading,
     bool? isBookmarked,
+    bool? hasMoreNewWords,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -74,6 +81,7 @@ class StudyState {
       isFlipped: isFlipped ?? this.isFlipped,
       isLoading: isLoading ?? this.isLoading,
       isBookmarked: isBookmarked ?? this.isBookmarked,
+      hasMoreNewWords: hasMoreNewWords ?? this.hasMoreNewWords,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
@@ -101,7 +109,17 @@ class StudyState {
 
 class StudyNotifier extends Notifier<StudyState> {
   @override
-  StudyState build() => StudyState.initial();
+  StudyState build() {
+    ref.listen<int>(
+      appDataEventsProvider.select((value) => value.settingsRevision),
+      (_, revision) {
+        if (revision > 0) {
+          loadTodayWords();
+        }
+      },
+    );
+    return StudyState.initial();
+  }
 
   // -- helpers --------------------------------------------------------------
 
@@ -145,6 +163,7 @@ class StudyNotifier extends Notifier<StudyState> {
 
       final remaining = quota - todayCount;
       if (remaining <= 0) {
+        final hasMoreNewWords = (await db.getNewWords(book, 1)).isNotEmpty;
         state = state.copyWith(
           words: [],
           currentIndex: 0,
@@ -152,6 +171,7 @@ class StudyNotifier extends Notifier<StudyState> {
           wordsLearnedToday: todayCount,
           isLoading: false,
           isFlipped: false,
+          hasMoreNewWords: hasMoreNewWords,
         );
         return;
       }
@@ -166,6 +186,7 @@ class StudyNotifier extends Notifier<StudyState> {
         isLoading: false,
         isFlipped: false,
         isBookmarked: false,
+        hasMoreNewWords: newWords.isNotEmpty,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: '加载失败：$e');
@@ -177,6 +198,26 @@ class StudyNotifier extends Notifier<StudyState> {
     state = state.copyWith(isFlipped: !state.isFlipped);
   }
 
+  /// Load up to 10 additional unlearned words without changing daily quota.
+  Future<void> loadExtraWords() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final db = await _db;
+      final book = await _readBook(db);
+      final extra = await db.getNewWords(book, 10);
+      state = state.copyWith(
+        words: extra,
+        currentIndex: 0,
+        isLoading: false,
+        isFlipped: false,
+        isBookmarked: false,
+        hasMoreNewWords: extra.isNotEmpty,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: '加载额外单词失败：$e');
+    }
+  }
+
   /// Mark the current word as **known** and advance to the next word.
   Future<void> markKnown() async {
     final word = state.currentWord;
@@ -186,10 +227,11 @@ class StudyNotifier extends Notifier<StudyState> {
       final db = await _db;
       final book = await _readBook(db);
       await db.upsertProgress(word.id, book, 1, _tomorrow);
+      ref.read(appDataEventsProvider.notifier).studyChanged();
+      _advanceToNext();
     } catch (_) {
-      // Silently ignore DB errors – the user experience is not blocked.
+      state = state.copyWith(errorMessage: '保存失败，请重试');
     }
-    _advanceToNext();
   }
 
   /// Mark the current word as **unknown**, add it to the notebook
@@ -203,10 +245,13 @@ class StudyNotifier extends Notifier<StudyState> {
       final book = await _readBook(db);
       await db.upsertProgress(word.id, book, 1, _tomorrow);
       await db.addToNotebook(word.id, 'unknown');
+      final events = ref.read(appDataEventsProvider.notifier);
+      events.studyChanged();
+      events.notebookChanged();
+      _advanceToNext();
     } catch (_) {
-      // Silently ignore DB errors.
+      state = state.copyWith(errorMessage: '保存失败，请重试');
     }
-    _advanceToNext();
   }
 
   /// Toggle the notebook (star / bookmark) status of the current word.
@@ -218,13 +263,13 @@ class StudyNotifier extends Notifier<StudyState> {
       final db = await _db;
       if (state.isBookmarked) {
         await db.removeFromNotebook(word.id);
-        state = state.copyWith(isBookmarked: false);
       } else {
         await db.addToNotebook(word.id, 'manual');
-        state = state.copyWith(isBookmarked: true);
       }
+      ref.read(appDataEventsProvider.notifier).notebookChanged();
+      _refreshBookmarkStatus();
     } catch (_) {
-      // Silently ignore DB errors.
+      state = state.copyWith(errorMessage: '保存失败，请重试');
     }
   }
 

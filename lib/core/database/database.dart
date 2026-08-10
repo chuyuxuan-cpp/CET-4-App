@@ -37,7 +37,8 @@ class Progress extends Table {
 class Notebook extends Table {
   IntColumn get wordId => integer().references(Words, #id)();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
-  TextColumn get source => text().withDefault(const Constant('manual'))(); // manual / unknown
+  TextColumn get source =>
+      text().withDefault(const Constant('manual'))(); // manual / unknown
 
   @override
   Set<Column> get primaryKey => {wordId};
@@ -90,22 +91,56 @@ class AppDatabase extends _$AppDatabase {
     progressSubquery.where(progress.book.equals(book));
 
     return (select(words)
-      ..where((t) => t.book.equals(book) & t.id.isNotInQuery(progressSubquery))
-      ..orderBy([(t) => OrderingTerm(expression: t.seq)])
-      ..limit(limit))
-      .get();
+          ..where(
+            (t) => t.book.equals(book) & t.id.isNotInQuery(progressSubquery),
+          )
+          ..orderBy([(t) => OrderingTerm(expression: t.seq)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Returns a stable page of words, optionally filtered by word or meaning.
+  Future<List<Word>> getWordbookPage({
+    required String book,
+    String? query,
+    required int offset,
+    required int limit,
+  }) {
+    if (offset < 0) {
+      throw ArgumentError.value(offset, 'offset', 'Must not be negative');
+    }
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'Must be greater than zero');
+    }
+
+    final normalizedQuery = query?.trim() ?? '';
+    final statement = select(words)..where((t) => t.book.equals(book));
+    if (normalizedQuery.isNotEmpty) {
+      final pattern = '%$normalizedQuery%';
+      statement.where((t) => t.word.like(pattern) | t.meaning.like(pattern));
+    }
+
+    return (statement
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.seq),
+            (t) => OrderingTerm(expression: t.id),
+          ])
+          ..limit(limit, offset: offset))
+        .get();
   }
 
   /// 获取今日需要复习的单词 ID 列表
   Future<List<int>> getReviewWordIds(String book, DateTime today) {
     final cutoff = DateTime(today.year, today.month, today.day + 1);
     return (selectOnly(progress)
-      ..addColumns([progress.wordId])
-      ..where(progress.book.equals(book)
-          & progress.nextReviewAt.isSmallerThanValue(cutoff)
-          & progress.stage.isNotValue(99)))
-      .map((row) => row.read(progress.wordId)!)
-      .get();
+          ..addColumns([progress.wordId])
+          ..where(
+            progress.book.equals(book) &
+                progress.nextReviewAt.isSmallerThanValue(cutoff) &
+                progress.stage.isNotValue(99),
+          ))
+        .map((row) => row.read(progress.wordId)!)
+        .get();
   }
 
   /// 获取复习单词的详细信息
@@ -116,17 +151,20 @@ class AppDatabase extends _$AppDatabase {
   /// 获取指定单词的当前复习阶段，返回 wordId → stage 的映射
   Future<Map<int, int>> getReviewStages(String book, List<int> wordIds) {
     return (selectOnly(progress)
-      ..addColumns([progress.wordId, progress.stage])
-      ..where(progress.book.equals(book) & progress.wordId.isIn(wordIds)))
-      .map((row) => MapEntry(row.read(progress.wordId)!, row.read(progress.stage)!))
-      .get()
-      .then((entries) {
-        final result = <int, int>{};
-        for (final e in entries) {
-          result[e.key] = e.value;
-        }
-        return result;
-      });
+          ..addColumns([progress.wordId, progress.stage])
+          ..where(progress.book.equals(book) & progress.wordId.isIn(wordIds)))
+        .map(
+          (row) =>
+              MapEntry(row.read(progress.wordId)!, row.read(progress.stage)!),
+        )
+        .get()
+        .then((entries) {
+          final result = <int, int>{};
+          for (final e in entries) {
+            result[e.key] = e.value;
+          }
+          return result;
+        });
   }
 
   /// 根据 ID 获取单词
@@ -135,7 +173,11 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// 获取随机单词（用于干扰项），排除指定 IDs
-  Future<List<Word>> getRandomWords(String book, int count, List<int> excludeIds) {
+  Future<List<Word>> getRandomWords(
+    String book,
+    int count,
+    List<int> excludeIds,
+  ) {
     final q = select(words)
       ..where((t) => t.book.equals(book) & t.id.isNotIn(excludeIds));
     return q.get().then((all) {
@@ -149,18 +191,25 @@ class AppDatabase extends _$AppDatabase {
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day + 1);
     return (selectOnly(progress)
-      ..addColumns([progress.wordId])
-      ..where(progress.book.equals(book)
-          & progress.firstLearnedAt.isBetweenValues(startOfDay, endOfDay)))
-      .map((row) => row.read(progress.wordId)!)
-      .get()
-      .then((rows) => rows.length);
+          ..addColumns([progress.wordId])
+          ..where(
+            progress.book.equals(book) &
+                progress.firstLearnedAt.isBetweenValues(startOfDay, endOfDay),
+          ))
+        .map((row) => row.read(progress.wordId)!)
+        .get()
+        .then((rows) => rows.length);
   }
 
   // --- Progress Mutations ---
 
   /// 创建或更新学习进度
-  Future<void> upsertProgress(int wordId, String book, int stage, DateTime nextReview) {
+  Future<void> upsertProgress(
+    int wordId,
+    String book,
+    int stage,
+    DateTime nextReview,
+  ) {
     return into(progress).insertOnConflictUpdate(
       ProgressCompanion(
         wordId: Value(wordId),
@@ -193,18 +242,18 @@ class AppDatabase extends _$AppDatabase {
   /// 判断是否在生词本中
   Future<bool> isInNotebook(int wordId) {
     return (selectOnly(notebook)
-      ..addColumns([notebook.wordId])
-      ..where(notebook.wordId.equals(wordId)))
-      .map((row) => row.read(notebook.wordId))
-      .getSingleOrNull()
-      .then((r) => r != null);
+          ..addColumns([notebook.wordId])
+          ..where(notebook.wordId.equals(wordId)))
+        .map((row) => row.read(notebook.wordId))
+        .getSingleOrNull()
+        .then((r) => r != null);
   }
 
   /// 获取生词本列表
   Future<List<NotebookWord>> getNotebookWords({String sortBy = 'time'}) {
-    final joined = select(notebook).join([
-      innerJoin(words, words.id.equalsExp(notebook.wordId)),
-    ]);
+    final joined = select(
+      notebook,
+    ).join([innerJoin(words, words.id.equalsExp(notebook.wordId))]);
     if (sortBy == 'alpha') {
       joined.orderBy([OrderingTerm.asc(words.word)]);
     } else {
@@ -222,7 +271,12 @@ class AppDatabase extends _$AppDatabase {
   // --- Quiz Records ---
 
   /// 记录答题
-  Future<void> recordQuiz(int wordId, String quizType, String direction, bool correct) {
+  Future<void> recordQuiz(
+    int wordId,
+    String quizType,
+    String direction,
+    bool correct,
+  ) {
     return into(quizRecords).insert(
       QuizRecordsCompanion(
         wordId: Value(wordId),
@@ -238,10 +292,10 @@ class AppDatabase extends _$AppDatabase {
 
   Future<String?> getSetting(String key) {
     return (selectOnly(settings)
-      ..addColumns([settings.value])
-      ..where(settings.key.equals(key)))
-      .map((row) => row.read(settings.value))
-      .getSingleOrNull();
+          ..addColumns([settings.value])
+          ..where(settings.key.equals(key)))
+        .map((row) => row.read(settings.value))
+        .getSingleOrNull();
   }
 
   Future<void> setSetting(String key, String value) {
@@ -250,12 +304,17 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// 重置当前词书的学习数据
+  /// 重置当前词书的学习数据，不影响其他词书关联的生词本和答题记录。
   Future<void> resetBook(String book) {
     return transaction(() async {
+      final wordIds = selectOnly(words)
+        ..addColumns([words.id])
+        ..where(words.book.equals(book));
       await (delete(progress)..where((t) => t.book.equals(book))).go();
-      await (delete(quizRecords)).go();
-      await (delete(notebook)).go();
+      await (delete(
+        quizRecords,
+      )..where((t) => t.wordId.isInQuery(wordIds))).go();
+      await (delete(notebook)..where((t) => t.wordId.isInQuery(wordIds))).go();
     });
   }
 }

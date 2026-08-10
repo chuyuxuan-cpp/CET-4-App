@@ -5,6 +5,7 @@ import 'package:cet4_app/core/providers/settings_provider.dart';
 import 'package:cet4_app/core/services/notification_service.dart';
 import 'package:cet4_app/features/settings/widgets/quota_selector.dart';
 import 'package:cet4_app/features/settings/widgets/settings_section.dart';
+import 'package:cet4_app/features/settings/wordbook_browser_screen.dart';
 
 /// 设置页面
 ///
@@ -68,23 +69,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _pickReminderTime() async {
     final current = ref.read(settingsProvider).reminderTime;
 
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: current,
-    );
+    final picked = await showTimePicker(context: context, initialTime: current);
 
     if (picked != null && mounted) {
-      await ref
-          .read(settingsProvider.notifier)
-          .setReminderTime(picked);
+      await ref.read(settingsProvider.notifier).setReminderTime(picked);
     }
   }
 
   // -- 状态：追踪通知权限是否被拒绝，以在 UI 上显示"未授权"提示 ------------
 
   Future<bool> _checkNotificationPermission() async {
-    final hasPermission =
-        await NotificationService().hasAndroidPermission;
+    final hasPermission = await NotificationService().hasAndroidPermission;
     return hasPermission ?? true; // 无法判断时默认允许
   }
 
@@ -99,10 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('设置'), centerTitle: true),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -133,10 +125,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         padding: const EdgeInsets.only(top: 8),
                         child: SegmentedButton<String>(
                           segments: const [
-                            ButtonSegment(
-                                value: 'cet4', label: Text('CET-4')),
-                            ButtonSegment(
-                                value: 'cet6', label: Text('CET-6')),
+                            ButtonSegment(value: 'cet4', label: Text('CET-4')),
+                            ButtonSegment(value: 'cet6', label: Text('CET-6')),
                           ],
                           selected: {state.activeBook},
                           onSelectionChanged: (sel) {
@@ -161,6 +151,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                    ),
+                    // 浏览当前词书
+                    ListTile(
+                      leading: const Icon(Icons.menu_book_outlined),
+                      title: const Text('浏览词书'),
+                      subtitle: Text('${state.bookLabel} 词汇列表'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const WordbookBrowserScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -247,7 +251,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ListTile(
                       leading: const Icon(Icons.info_outline),
                       title: const Text('版本'),
-                      subtitle: const Text('1.0.0'),
+                      subtitle: const Text('1.0.1'),
                     ),
                     ListTile(
                       title: const Text('四六级背单词'),

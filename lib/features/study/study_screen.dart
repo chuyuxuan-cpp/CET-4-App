@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 
 import 'package:cet4_app/core/providers/study_provider.dart';
+import 'package:cet4_app/core/services/tts_service.dart';
 import 'package:cet4_app/features/study/widgets/word_card.dart';
 import 'package:cet4_app/features/study/widgets/study_buttons.dart';
 
@@ -19,16 +21,13 @@ class StudyScreen extends ConsumerStatefulWidget {
 
 class _StudyScreenState extends ConsumerState<StudyScreen>
     with WidgetsBindingObserver {
-  late final FlutterTts _tts;
+  final TtsService _tts = TtsService();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tts = FlutterTts();
-    _tts.setLanguage('en-US');
-    _tts.setSpeechRate(0.45);
-    _tts.setPitch(1.0);
+    _tts.initialize().catchError((_) {});
 
     // Kick-off loading after the first frame so the provider is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -39,7 +38,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _tts.stop();
+    _tts.dispose();
     super.dispose();
   }
 
@@ -208,6 +207,7 @@ class _StudyScreenState extends ConsumerState<StudyScreen>
 
   Widget _buildCompletedView(StudyState state) {
     final theme = Theme.of(context);
+    final notifier = ref.read(studyProvider.notifier);
 
     return Center(
       child: Padding(
@@ -239,10 +239,19 @@ class _StudyScreenState extends ConsumerState<StudyScreen>
               ),
             ),
             const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed:
+                  state.hasMoreNewWords
+                      ? () => notifier.loadExtraWords()
+                      : null,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(
+                state.hasMoreNewWords ? '再来 10 词' : '当前词书已无新词',
+              ),
+            ),
+            const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () {
-                ref.read(studyProvider.notifier).loadTodayWords();
-              },
+              onPressed: () => notifier.loadTodayWords(),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('刷新'),
             ),
@@ -259,8 +268,12 @@ class _StudyScreenState extends ConsumerState<StudyScreen>
   Future<void> _speak(String text) async {
     try {
       await _tts.speak(text);
-    } catch (_) {
-      // Silently ignore TTS errors – the button is optional UX.
+    } on TtsException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
     }
   }
 }

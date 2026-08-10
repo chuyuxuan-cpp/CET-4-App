@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cet4_app/core/providers/app_data_events_provider.dart';
 import 'package:cet4_app/core/providers/quiz_provider.dart';
 import 'package:cet4_app/features/quiz/widgets/quiz_fill_blank.dart';
 import 'package:cet4_app/features/quiz/widgets/quiz_option_button.dart';
@@ -17,6 +18,7 @@ class QuizScreen extends ConsumerStatefulWidget {
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
   static const _labels = ['A', 'B', 'C', 'D'];
+  int _lastSettingsRevision = 0;
 
   @override
   void initState() {
@@ -32,6 +34,17 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(quizProvider);
+    final settingsRevision =
+        ref.watch(appDataEventsProvider.select((v) => v.settingsRevision));
+
+    // Reload quiz when settings/active-book changes, but only if idle.
+    if (settingsRevision != _lastSettingsRevision && mounted) {
+      _lastSettingsRevision = settingsRevision;
+      if (state.questions.isEmpty ||
+          state.isFinished) {
+        ref.read(quizProvider.notifier).loadQuiz();
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
