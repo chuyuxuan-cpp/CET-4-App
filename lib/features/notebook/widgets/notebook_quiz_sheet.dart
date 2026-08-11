@@ -72,7 +72,7 @@ class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
     // Auto-advance when hasAnswered flips to true.
     if (widget.hasAnswered && !oldWidget.hasAnswered) {
       _autoTimer?.cancel();
-      _autoTimer = Timer(const Duration(seconds: 1), () => widget.onNext());
+      _autoTimer = Timer(const Duration(milliseconds: 700), () => widget.onNext());
     }
   }
 
@@ -102,17 +102,6 @@ class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
 
           // Answer area
           Expanded(child: _buildAnswerArea(theme)),
-
-          // Next button
-          if (widget.hasAnswered)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: FilledButton.icon(
-                onPressed: widget.onNext,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('下一题'),
-              ),
-            ),
         ],
       ),
     );

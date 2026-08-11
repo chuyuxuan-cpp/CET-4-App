@@ -169,7 +169,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
     // Auto-advance after answer with a 1-second delay.
     if (isAnswered && _autoAdvanceTimer == null) {
-      _autoAdvanceTimer = Timer(const Duration(seconds: 1), () {
+      _autoAdvanceTimer = Timer(const Duration(milliseconds: 700), () {
         if (mounted) {
           ref.read(quizProvider.notifier).nextQuestion();
         }
@@ -193,8 +193,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           ),
         ),
 
-        // 下一题按钮（仅作答后显示）
-        if (isAnswered) _buildNextButton(state),
+        // 下一题按钮（已移除——自动跳转）
+        if (isAnswered) const SizedBox.shrink(),
       ],
     );
   }
@@ -364,36 +364,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           : (answer) => ref
               .read(quizProvider.notifier)
               .submitAnswer(state.currentIndex, answer),
-    );
-  }
-
-  // ----------------------------------------------------------
-  // 下一题按钮
-  // ----------------------------------------------------------
-
-  Widget _buildNextButton(QuizState state) {
-    final isLast = state.currentIndex + 1 >= state.totalQuestions;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: () => ref.read(quizProvider.notifier).nextQuestion(),
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              isLast ? '查看结果' : '下一题',
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
