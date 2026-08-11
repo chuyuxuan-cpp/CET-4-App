@@ -38,9 +38,7 @@ class QuizOptionButton extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+      child: Container(
         decoration: BoxDecoration(
           color: colors.background,
           border: Border.all(color: colors.border, width: 1.5),

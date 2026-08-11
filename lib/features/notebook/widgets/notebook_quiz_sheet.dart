@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:cet4_app/core/providers/notebook_provider.dart';
@@ -47,6 +49,7 @@ class NotebookQuizSheet extends StatefulWidget {
 class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
   final _textController = TextEditingController();
   int? _selectedOptionIndex;
+  Timer? _autoTimer;
 
   @override
   void initState() {
@@ -63,11 +66,19 @@ class _NotebookQuizSheetState extends State<NotebookQuizSheet> {
     if (widget.question.word.id != oldWidget.question.word.id) {
       _selectedOptionIndex = null;
       _textController.clear();
+      _autoTimer?.cancel();
+      _autoTimer = null;
+    }
+    // Auto-advance when hasAnswered flips to true.
+    if (widget.hasAnswered && !oldWidget.hasAnswered) {
+      _autoTimer?.cancel();
+      _autoTimer = Timer(const Duration(seconds: 1), () => widget.onNext());
     }
   }
 
   @override
   void dispose() {
+    _autoTimer?.cancel();
     _textController.dispose();
     super.dispose();
   }

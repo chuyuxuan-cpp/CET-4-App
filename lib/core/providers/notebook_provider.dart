@@ -44,6 +44,9 @@ class NotebookState {
   /// Sort order: 'time' (addedAt desc) or 'alpha' (word asc).
   final String sortBy;
 
+  /// Quiz word range: 'week' (last 7 days) or 'all' (all notebook words).
+  final String quizRange;
+
   /// True while an async load is in progress.
   final bool isLoading;
 
@@ -80,6 +83,7 @@ class NotebookState {
     required this.correctCount,
     required this.wrongCount,
     required this.isQuizFinished,
+    required this.quizRange,
     this.errorMessage,
   });
 
@@ -93,11 +97,13 @@ class NotebookState {
     correctCount: 0,
     wrongCount: 0,
     isQuizFinished: false,
+    quizRange: 'week',
   );
 
   NotebookState copyWith({
     List<NotebookWord>? words,
     String? sortBy,
+    String? quizRange,
     bool? isLoading,
     bool? isQuizMode,
     List<NotebookQuestion>? questions,
@@ -111,6 +117,7 @@ class NotebookState {
     return NotebookState(
       words: words ?? this.words,
       sortBy: sortBy ?? this.sortBy,
+      quizRange: quizRange ?? this.quizRange,
       isLoading: isLoading ?? this.isLoading,
       isQuizMode: isQuizMode ?? this.isQuizMode,
       questions: questions ?? this.questions,
@@ -133,8 +140,8 @@ class NotebookState {
   /// The question currently being displayed, or null.
   NotebookQuestion? get currentQuestion =>
       hasQuizQuestions && currentQuizIndex < questions.length
-          ? questions[currentQuizIndex]
-          : null;
+      ? questions[currentQuizIndex]
+      : null;
 
   /// Human-readable quiz progress, e.g. "3/20".
   String get quizProgress {
@@ -194,10 +201,7 @@ class NotebookNotifier extends Notifier<NotebookState> {
       final words = await db.getNotebookWords(sortBy: state.sortBy);
       state = state.copyWith(words: words, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: '加载生词本失败：$e',
-      );
+      state = state.copyWith(isLoading: false, errorMessage: '加载生词本失败：$e');
     }
   }
 
@@ -211,6 +215,11 @@ class NotebookNotifier extends Notifier<NotebookState> {
   Future<void> sortByAlpha() async {
     state = state.copyWith(sortBy: 'alpha');
     await loadWords();
+  }
+
+  /// Set the quiz word range filter.
+  void setQuizRange(String range) {
+    state = state.copyWith(quizRange: range);
   }
 
   /// Remove a word from the notebook and update the local list.
@@ -245,7 +254,24 @@ class NotebookNotifier extends Notifier<NotebookState> {
       // Select up to 20 words at random.
       final sourceWords = List<NotebookWord>.from(state.words);
       sourceWords.shuffle(_random);
-      final selected = sourceWords.take(20).toList();
+
+      // Filter by quiz range: 'week' limits to words added in the last 7 days.
+      final filteredWords = state.quizRange == 'week'
+          ? sourceWords
+              .where((nw) => nw.addedAt
+                  .isAfter(DateTime.now().subtract(const Duration(days: 7))))
+              .toList()
+          : sourceWords;
+
+      if (filteredWords.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: '最近7天没有新增生词',
+        );
+        return;
+      }
+
+      final selected = filteredWords.take(20).toList();
 
       // Randomly assign en2cn / cn2en direction.
       final directions = <bool>[];
@@ -280,20 +306,24 @@ class NotebookNotifier extends Notifier<NotebookState> {
             }
           }
           options.shuffle(_random);
-          questions.add(NotebookQuestion(
-            word: nw.word,
-            isEn2Cn: true,
-            options: options,
-            correctAnswer: correctMeaning,
-          ));
+          questions.add(
+            NotebookQuestion(
+              word: nw.word,
+              isEn2Cn: true,
+              options: options,
+              correctAnswer: correctMeaning,
+            ),
+          );
         } else {
           // cn2en: fill in the blank.
-          questions.add(NotebookQuestion(
-            word: nw.word,
-            isEn2Cn: false,
-            options: [],
-            correctAnswer: nw.word.word,
-          ));
+          questions.add(
+            NotebookQuestion(
+              word: nw.word,
+              isEn2Cn: false,
+              options: [],
+              correctAnswer: nw.word.word,
+            ),
+          );
         }
       }
 
@@ -307,10 +337,7 @@ class NotebookNotifier extends Notifier<NotebookState> {
         isQuizFinished: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: '生成自测题目失败：$e',
-      );
+      state = state.copyWith(isLoading: false, errorMessage: '生成自测题目失败：$e');
     }
   }
 
@@ -359,10 +386,7 @@ class NotebookNotifier extends Notifier<NotebookState> {
   void nextQuizQuestion() {
     final nextIdx = state.currentQuizIndex + 1;
     if (nextIdx >= state.questions.length) {
-      state = state.copyWith(
-        currentQuizIndex: nextIdx,
-        isQuizFinished: true,
-      );
+      state = state.copyWith(currentQuizIndex: nextIdx, isQuizFinished: true);
     } else {
       state = state.copyWith(currentQuizIndex: nextIdx);
     }

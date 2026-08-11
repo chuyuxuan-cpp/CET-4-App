@@ -16,6 +16,9 @@ class QuizFillBlank extends StatefulWidget {
   /// 正确答案（英文单词）
   final String correctAnswer;
 
+  /// 词性（可选）
+  final String? pos;
+
   /// 提交答案回调
   final ValueChanged<String>? onSubmit;
 
@@ -25,6 +28,7 @@ class QuizFillBlank extends StatefulWidget {
     this.isAnswered = false,
     this.isCorrect,
     this.correctAnswer = '',
+    this.pos,
     this.onSubmit,
   });
 
@@ -63,6 +67,16 @@ class _QuizFillBlankState extends State<QuizFillBlank> {
             '请拼写中文意思「${widget.meaning}」对应的英文单词：',
             style: theme.textTheme.titleMedium?.copyWith(fontSize: 18, height: 1.5),
           ),
+          if (widget.pos != null && widget.pos!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                widget.pos!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
           const SizedBox(height: 28),
 
           // 文本输入
@@ -128,8 +142,7 @@ class _QuizFillBlankState extends State<QuizFillBlank> {
 
   Widget _buildResult(ThemeData theme) {
     if (widget.isCorrect == true) {
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+      return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.green.shade50,
@@ -153,8 +166,7 @@ class _QuizFillBlankState extends State<QuizFillBlank> {
         ),
       );
     } else {
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+      return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.red.shade50,

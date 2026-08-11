@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,12 +21,20 @@ class QuizScreen extends ConsumerStatefulWidget {
 class _QuizScreenState extends ConsumerState<QuizScreen> {
   static const _labels = ['A', 'B', 'C', 'D'];
   int _lastSettingsRevision = 0;
+  Timer? _autoAdvanceTimer;
+  int _lastQuestionIndex = -1;
 
   @override
   void initState() {
     super.initState();
     // 页面初始化后异步加载题目
     Future.microtask(() => ref.read(quizProvider.notifier).loadQuiz());
+  }
+
+  @override
+  void dispose() {
+    _autoAdvanceTimer?.cancel();
+    super.dispose();
   }
 
   // ==========================================================
@@ -149,6 +159,22 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final question = state.questions[state.currentIndex];
     final isAnswered = state.answerResults.containsKey(state.currentIndex);
     final isCorrect = state.answerResults[state.currentIndex];
+
+    // Cancel timer when question changes.
+    if (state.currentIndex != _lastQuestionIndex) {
+      _autoAdvanceTimer?.cancel();
+      _autoAdvanceTimer = null;
+      _lastQuestionIndex = state.currentIndex;
+    }
+
+    // Auto-advance after answer with a 1-second delay.
+    if (isAnswered && _autoAdvanceTimer == null) {
+      _autoAdvanceTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) {
+          ref.read(quizProvider.notifier).nextQuestion();
+        }
+      });
+    }
 
     return Column(
       children: [
@@ -329,6 +355,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       // 使用 currentIndex 作为 key，确保切换题目时重建 State
       key: ValueKey('fill_${state.currentIndex}'),
       meaning: question.word.meaning ?? '未知释义',
+      pos: question.word.pos,
       isAnswered: isAnswered,
       isCorrect: isCorrect,
       correctAnswer: question.correctAnswer,

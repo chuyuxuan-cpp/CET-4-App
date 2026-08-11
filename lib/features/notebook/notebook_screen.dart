@@ -126,6 +126,8 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
         children: [
           // Sort toggle chips.
           _buildSortChips(state),
+          // Quiz range filter chips.
+          _buildQuizRangeChips(state),
           // List.
           Expanded(
             child: ListView.builder(
@@ -217,6 +219,31 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
             selected: state.sortBy == 'alpha',
             onSelected: (_) =>
                 ref.read(notebookProvider.notifier).sortByAlpha(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuizRangeChips(NotebookState state) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_list_rounded, size: 18),
+          const SizedBox(width: 8),
+          FilterChip.elevated(
+            label: const Text('最近7天'),
+            selected: state.quizRange == 'week',
+            onSelected: (_) =>
+                ref.read(notebookProvider.notifier).setQuizRange('week'),
+          ),
+          const SizedBox(width: 8),
+          FilterChip.elevated(
+            label: const Text('全部生词'),
+            selected: state.quizRange == 'all',
+            onSelected: (_) =>
+                ref.read(notebookProvider.notifier).setQuizRange('all'),
           ),
         ],
       ),
