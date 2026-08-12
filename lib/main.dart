@@ -4,9 +4,11 @@ import 'features/study/study_screen.dart';
 import 'features/quiz/quiz_screen.dart';
 import 'features/notebook/notebook_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'core/services/notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  NotificationService().initialize();
   runApp(const ProviderScope(child: CET4App()));
 }
 

@@ -37,6 +37,21 @@ class NotificationService {
 
     // Android 13+ 需要运行时请求通知权限
     await _requestAndroidPermission();
+
+    // iOS 主动请求通知权限
+    await _requestIosPermission();
+  }
+
+  Future<void> _requestIosPermission() async {
+    final iosPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+    if (iosPlugin == null) return;
+    await iosPlugin.requestPermissions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
   }
 
   /// 请求 Android 13+ 通知权限；已授权或更低版本为 no-op。
