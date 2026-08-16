@@ -108,9 +108,53 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
     if (state.words.isEmpty && !state.isLoading) return null;
 
     return FloatingActionButton.extended(
-      onPressed: () => ref.read(notebookProvider.notifier).startQuiz(),
+      onPressed: () => _showQuizRangePicker(),
       icon: const Icon(Icons.quiz_outlined),
       label: const Text('生词自测'),
+    );
+  }
+
+  Future<void> _showQuizRangePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                '选择自测范围',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.today_rounded),
+              title: const Text('最近1天'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ref.read(notebookProvider.notifier).startQuiz(range: 'day');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.date_range_rounded),
+              title: const Text('最近7天'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ref.read(notebookProvider.notifier).startQuiz(range: 'week');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.all_inclusive_rounded),
+              title: const Text('全部生词'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ref.read(notebookProvider.notifier).startQuiz(range: 'all');
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -153,8 +197,6 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
           _buildSearchBar(),
           // Sort toggle chips.
           _buildSortChips(state),
-          // Quiz range filter chips.
-          _buildQuizRangeChips(state),
           // List.
           Expanded(
             child: filtered.isEmpty
@@ -362,31 +404,6 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
             selected: state.sortBy == 'alpha',
             onSelected: (_) =>
                 ref.read(notebookProvider.notifier).sortByAlpha(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuizRangeChips(NotebookState state) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          const Icon(Icons.filter_list_rounded, size: 18),
-          const SizedBox(width: 8),
-          FilterChip.elevated(
-            label: const Text('最近7天'),
-            selected: state.quizRange == 'week',
-            onSelected: (_) =>
-                ref.read(notebookProvider.notifier).setQuizRange('week'),
-          ),
-          const SizedBox(width: 8),
-          FilterChip.elevated(
-            label: const Text('全部生词'),
-            selected: state.quizRange == 'all',
-            onSelected: (_) =>
-                ref.read(notebookProvider.notifier).setQuizRange('all'),
           ),
         ],
       ),

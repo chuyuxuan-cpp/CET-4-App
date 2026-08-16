@@ -44,7 +44,8 @@ class NotebookState {
   /// Sort order: 'time' (addedAt desc) or 'alpha' (word asc).
   final String sortBy;
 
-  /// Quiz word range: 'week' (last 7 days) or 'all' (all notebook words).
+  /// Quiz word range: 'day' (last 1 day), 'week' (last 7 days) or 'all'
+  /// (all notebook words).
   final String quizRange;
 
   /// True while an async load is in progress.
@@ -97,7 +98,7 @@ class NotebookState {
     correctCount: 0,
     wrongCount: 0,
     isQuizFinished: false,
-    quizRange: 'week',
+    quizRange: 'day',
   );
 
   NotebookState copyWith({
@@ -242,8 +243,12 @@ class NotebookNotifier extends Notifier<NotebookState> {
   /// Each word gets a randomly assigned direction (en2cn multiple-choice
   /// or cn2en fill-in-the-blank). Distractors for en2cn questions are
   /// sampled from the word bank, excluding all quiz-word IDs.
-  Future<void> startQuiz() async {
+  Future<void> startQuiz({String? range}) async {
     if (state.words.isEmpty) return;
+
+    if (range != null) {
+      state = state.copyWith(quizRange: range);
+    }
 
     state = state.copyWith(isLoading: true, clearError: true);
 
@@ -255,18 +260,33 @@ class NotebookNotifier extends Notifier<NotebookState> {
       final sourceWords = List<NotebookWord>.from(state.words);
       sourceWords.shuffle(_random);
 
-      // Filter by quiz range: 'week' limits to words added in the last 7 days.
-      final filteredWords = state.quizRange == 'week'
-          ? sourceWords
-              .where((nw) => nw.addedAt
-                  .isAfter(DateTime.now().subtract(const Duration(days: 7))))
-              .toList()
-          : sourceWords;
+      // Filter by quiz range: 'day' (last 1 day), 'week' (last 7 days), or
+      // 'all' (every notebook word).
+      final now = DateTime.now();
+      final List<NotebookWord> filteredWords;
+      final String emptyMessage;
+      switch (state.quizRange) {
+        case 'day':
+          filteredWords = sourceWords
+              .where((nw) =>
+                  nw.addedAt.isAfter(now.subtract(const Duration(days: 1))))
+              .toList();
+          emptyMessage = '最近1天没有新增生词';
+        case 'week':
+          filteredWords = sourceWords
+              .where((nw) =>
+                  nw.addedAt.isAfter(now.subtract(const Duration(days: 7))))
+              .toList();
+          emptyMessage = '最近7天没有新增生词';
+        default:
+          filteredWords = sourceWords;
+          emptyMessage = '生词本为空';
+      }
 
       if (filteredWords.isEmpty) {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: '最近7天没有新增生词',
+          errorMessage: emptyMessage,
         );
         return;
       }
