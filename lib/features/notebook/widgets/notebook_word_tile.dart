@@ -32,13 +32,15 @@ class NotebookWordTile extends StatelessWidget {
         word.word.isNotEmpty ? word.word.characters.first.toUpperCase() : '?';
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       leading: CircleAvatar(
+        radius: 16,
         backgroundColor: cs.primaryContainer,
         foregroundColor: cs.onPrimaryContainer,
         child: Text(
           firstLetter,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       title: Text(

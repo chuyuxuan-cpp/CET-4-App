@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cet4_app/core/database/database.dart';
 import 'package:cet4_app/core/providers/notebook_provider.dart';
 import 'package:cet4_app/features/notebook/widgets/notebook_quiz_sheet.dart';
 import 'package:cet4_app/features/notebook/widgets/notebook_word_tile.dart';
@@ -20,6 +21,13 @@ class NotebookScreen extends ConsumerStatefulWidget {
 }
 
 class _NotebookScreenState extends ConsumerState<NotebookScreen> {
+  /// Fixed height of each word tile in the list (drives the index bar jump).
+  static const double _itemExtent = 76.0;
+
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +35,13 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notebookProvider.notifier).loadWords();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -120,83 +135,211 @@ class _NotebookScreenState extends ConsumerState<NotebookScreen> {
     }
 
     // Word list.
+    // Search filter: case-insensitive match on english or chinese meaning.
+    final query = _searchQuery.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? state.words
+        : state.words.where((nw) {
+            final word = nw.word;
+            return word.word.toLowerCase().contains(query) ||
+                (word.meaning ?? '').toLowerCase().contains(query);
+          }).toList();
+
     return RefreshIndicator(
       onRefresh: () => ref.read(notebookProvider.notifier).loadWords(),
       child: Column(
         children: [
+          // Search bar.
+          _buildSearchBar(),
           // Sort toggle chips.
           _buildSortChips(state),
           // Quiz range filter chips.
           _buildQuizRangeChips(state),
           // List.
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80), // room for FAB
-              itemCount: state.words.length,
-              itemBuilder: (context, index) {
-                final nw = state.words[index];
-                return Dismissible(
-                  key: ValueKey(nw.word.id),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 24),
-                    color: Colors.red,
-                    child: const Icon(Icons.delete_rounded,
-                        color: Colors.white),
-                  ),
-                  confirmDismiss: (_) async {
-                    return await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('移出生词本'),
-                        content: Text('确定要移除「${nw.word.word}」吗？'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('取消'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('移除'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  onDismissed: (_) {
-                    ref
-                        .read(notebookProvider.notifier)
-                        .removeWord(nw.word.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('已移出「${nw.word.word}」'),
-                        action: SnackBarAction(
-                          label: '撤销',
-                          onPressed: () {
-                            // Re-add through the database helper.
-                            // We don't have a direct add-back here, so skip
-                            // for now – the user can re-add from the study
-                            // screen.
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                  child: NotebookWordTile(
-                    notebookWord: nw,
-                    onRemove: () {
-                      ref
-                          .read(notebookProvider.notifier)
-                          .removeWord(nw.word.id);
-                    },
-                  ),
-                );
-              },
-            ),
+            child: filtered.isEmpty
+                ? const Center(child: Text('未找到匹配的生词'))
+                : _buildWordList(state, filtered),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: '搜索生词',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: '清除',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHighest
+              .withValues(alpha: 0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  /// Builds the scrollable word list, overlaid with an A–Z index bar when
+  /// sorting alphabetically and no search query is active.
+  Widget _buildWordList(NotebookState state, List<NotebookWord> filtered) {
+    // Index map: first-letter (uppercase) -> index of first matching word.
+    final Map<String, int> letterIndex = <String, int>{};
+    if (state.sortBy == 'alpha' && _searchQuery.isEmpty) {
+      for (int i = 0; i < filtered.length; i++) {
+        final word = filtered[i].word.word;
+        if (word.isEmpty) continue;
+        final letter = word.characters.first.toUpperCase();
+        letterIndex.putIfAbsent(letter, () => i);
+      }
+    }
+
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _scrollController,
+          itemExtent: _itemExtent,
+          padding: const EdgeInsets.only(bottom: 80), // room for FAB
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final nw = filtered[index];
+            return Dismissible(
+              key: ValueKey(nw.word.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 24),
+                color: Colors.red,
+                child: const Icon(Icons.delete_rounded,
+                    color: Colors.white),
+              ),
+              confirmDismiss: (_) async {
+                return await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('移出生词本'),
+                    content: Text('确定要移除「${nw.word.word}」吗？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('取消'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('移除'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              onDismissed: (_) {
+                ref
+                    .read(notebookProvider.notifier)
+                    .removeWord(nw.word.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('已移出「${nw.word.word}」'),
+                    action: SnackBarAction(
+                      label: '撤销',
+                      onPressed: () {
+                        // Re-add through the database helper.
+                        // We don't have a direct add-back here, so skip
+                        // for now – the user can re-add from the study
+                        // screen.
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: NotebookWordTile(
+                notebookWord: nw,
+                onRemove: () {
+                  ref
+                      .read(notebookProvider.notifier)
+                      .removeWord(nw.word.id);
+                },
+              ),
+            );
+          },
+        ),
+        // A–Z index bar.
+        if (letterIndex.isNotEmpty)
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _buildIndexBar(letterIndex),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildIndexBar(Map<String, int> letterIndex) {
+    final theme = Theme.of(context);
+    final letters = letterIndex.keys.toList()..sort();
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final letter in letters)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _jumpToLetter(letterIndex[letter]!),
+              child: SizedBox(
+                width: 24,
+                height: 20,
+                child: Center(
+                  child: Text(
+                    letter,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _jumpToLetter(int index) {
+    if (!_scrollController.hasClients) return;
+    final target = (index * _itemExtent).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
     );
   }
 
