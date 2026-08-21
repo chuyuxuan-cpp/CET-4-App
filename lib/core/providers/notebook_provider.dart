@@ -238,7 +238,7 @@ class NotebookNotifier extends Notifier<NotebookState> {
 
   // -- quiz mode actions -----------------------------------------------------
 
-  /// Generate a quiz from up to 20 randomly selected notebook words.
+  /// Generate a quiz from all notebook words in the selected range.
   ///
   /// Each word gets a randomly assigned direction (en2cn multiple-choice
   /// or cn2en fill-in-the-blank). Distractors for en2cn questions are
@@ -256,7 +256,7 @@ class NotebookNotifier extends Notifier<NotebookState> {
       final db = await _db;
       final book = await _readBook(db);
 
-      // Select up to 20 words at random.
+      // Select all words at random (order shuffled).
       final sourceWords = List<NotebookWord>.from(state.words);
       sourceWords.shuffle(_random);
 
@@ -291,7 +291,9 @@ class NotebookNotifier extends Notifier<NotebookState> {
         return;
       }
 
-      final selected = filteredWords.take(20).toList();
+      // Use all matching words (no hard cap) so 1-day / 7-day / all ranges
+      // return every word that falls within the selected time window.
+      final selected = filteredWords;
 
       // Randomly assign en2cn / cn2en direction.
       final directions = <bool>[];

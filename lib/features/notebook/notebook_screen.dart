@@ -11,8 +11,9 @@ import 'package:cet4_app/features/notebook/widgets/notebook_word_tile.dart';
 /// Has two modes:
 /// - **List mode** (default): shows all notebook words with sort toggles,
 ///   swipe-to-delete, pull-to-refresh, and a FAB to start a quiz.
-/// - **Quiz mode**: displays quiz questions from up to 20 random notebook
-///   words, mixing en2cn multiple choice and cn2en fill-in-the-blank.
+/// - **Quiz mode**: displays quiz questions from notebook words in the
+///   selected time range, mixing en2cn multiple choice and cn2en
+///   fill-in-the-blank.
 class NotebookScreen extends ConsumerStatefulWidget {
   const NotebookScreen({super.key});
 
