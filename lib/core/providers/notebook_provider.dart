@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cet4_app/core/database/database.dart';
@@ -374,6 +375,11 @@ class NotebookNotifier extends Notifier<NotebookState> {
     if (question.isCorrect != null) return; // already answered
 
     final isCorrect = _checkAnswer(question, answer);
+
+    // 播放答题音效
+    SystemSound.play(
+      isCorrect ? SystemSoundType.click : SystemSoundType.alert,
+    );
 
     // Mutable fields on NotebookQuestion allow in-place update, but we
     // replace the list entry to produce a proper state change.

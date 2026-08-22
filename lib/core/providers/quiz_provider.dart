@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cet4_app/core/database/database.dart';
@@ -189,6 +190,11 @@ class QuizNotifier extends StateNotifier<QuizState> {
     final question = state.questions[questionIndex];
     final isCorrect = _checkAnswer(question, answer);
     final today = DateTime.now();
+
+    // 播放答题音效
+    SystemSound.play(
+      isCorrect ? SystemSoundType.click : SystemSoundType.alert,
+    );
 
     // 计算复习进度
     final currentStage = state.wordStages[question.word.id] ?? 1;

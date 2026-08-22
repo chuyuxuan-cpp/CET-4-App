@@ -251,7 +251,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ListTile(
                       leading: const Icon(Icons.info_outline),
                       title: const Text('版本'),
-                      subtitle: const Text('1.3.1'),
+                      subtitle: const Text('1.3.2'),
                     ),
                     ListTile(
                       title: const Text('四六级背单词'),
