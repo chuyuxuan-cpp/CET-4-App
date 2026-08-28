@@ -13,3 +13,7 @@ After every code-writing task, stage all changes, commit with a descriptive mess
 ## Sound Notification
 
 Every task completion triggers a system notification sound.
+
+## Disk Space Constraint
+
+C drive space is precious. Never install SDKs, emulators, caches, or dependencies on C:. All dev tooling lives on D: (Flutter SDK, Android SDK at `D:\Android\Sdk`, AVDs at `D:\Android\avd`, Gradle at `D:\Dev\gradle`, Pub cache at `D:\Dev\pub-cache`) and the project itself is on E:. User-level env vars are already configured; keep them intact.

@@ -1,0 +1,60 @@
+讯飞智能体自动发送工具
+======================
+
+功能：开机后每 10 分钟自动打开讯飞智能体聊天页面，发送“什么是SPFA算法”，等待 3 分钟后关闭浏览器。
+
+
+一、安装依赖
+-----------
+1. 确保电脑已安装 Python 3.8 或以上版本。
+2. 确保电脑已安装 Microsoft Edge 浏览器（Windows 10/11 通常自带）。
+3. 解压后，在文件夹地址栏输入 cmd 回车，然后执行：
+
+    pip install -r requirements.txt
+
+4. 下载与 Edge 版本对应的 msedgedriver.exe：
+   - 查看 Edge 版本：打开 Edge → 设置 → 关于 Microsoft Edge
+   - 下载地址（阿里云镜像）：https://registry.npmmirror.com/binary.html?path=edgedriver/
+   - 把下载的 msedgedriver.exe 放到本文件夹内
+
+
+二、运行测试
+-----------
+双击运行 run_chat.bat，首次会弹出登录窗口，手动登录一次即可。
+登录成功后，脚本会自动发送消息并循环运行。
+
+如果只想手动测试，也可以打开 PowerShell 执行：
+
+    python chat_automation.py
+
+
+三、设置开机自动运行
+------------------
+以管理员身份打开 PowerShell，执行：
+
+    & "setup_startup.ps1"
+
+之后每次开机登录后，都会自动每 10 分钟运行一次。
+
+如需停止：打开“任务计划程序”，删除名为 XfyunChatAutoSend 的任务。
+
+
+四、修改发送内容
+--------------
+用记事本打开 chat_automation.py，找到下面这行：
+
+    MESSAGE = "什么是SPFA算法"
+
+把引号里的内容改成你想发送的消息即可。
+
+
+五、常见问题
+----------
+Q: 提示找不到 msedgedriver.exe？
+A: 请把对应 Edge 版本的 msedgedriver.exe 放到本文件夹。
+
+Q: 每次运行都要重新登录？
+A: 脚本会自动创建 browser_profile 文件夹保存登录状态。只要不删除该文件夹，登录状态就会保留。
+
+Q: 想关闭自动运行？
+A: 任务计划程序 → 找到 XfyunChatAutoSend → 右键删除。

@@ -111,6 +111,9 @@ class QuizState {
 /// 复习阶段递进表
 const _stageProgression = <int, int>{1: 3, 3: 7, 7: 99};
 
+/// 单日自出卷题量上限，避免单日复习计划过重
+const _maxDailyQuestions = 120;
+
 class QuizNotifier extends StateNotifier<QuizState> {
   final AppDatabase _db;
 
@@ -141,15 +144,18 @@ class QuizNotifier extends StateNotifier<QuizState> {
         return;
       }
 
-      // 3. 加载单词详情和当前复习阶段
+      // 3. 加载单词详情和当前复习阶段（题量封顶，避免单日计划过重）
       final words = await db.getReviewWords(wordIds);
       final stages = await db.getReviewStages(book, wordIds);
+
+      // 单日自出卷最多 120 题，超出部分留待后续复习
+      final cappedWords = words.take(_maxDailyQuestions).toList();
 
       // 4. 为每个单词生成题目
       final random = Random();
       final questions = <QuizQuestion>[];
 
-      for (final word in words) {
+      for (final word in cappedWords) {
         final isEn2Cn = random.nextBool();
 
         if (isEn2Cn) {
