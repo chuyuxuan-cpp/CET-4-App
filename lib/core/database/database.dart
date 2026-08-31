@@ -26,7 +26,7 @@ class Progress extends Table {
   IntColumn get wordId => integer().references(Words, #id)();
   TextColumn get book => text().withDefault(const Constant('cet4'))();
   DateTimeColumn get firstLearnedAt => dateTime().nullable()();
-  IntColumn get stage => integer().withDefault(const Constant(1))(); // 1/3/7/99
+  IntColumn get stage => integer().withDefault(const Constant(1))(); // 1/3/7/15 复习间隔，99 为已掌握哨兵
   DateTimeColumn get nextReviewAt => dateTime().nullable()();
 
   @override
@@ -84,16 +84,27 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Words Queries ---
 
-  /// 获取当前词书中未学习的单词，按 seq 排序，限制数量
-  Future<List<Word>> getNewWords(String book, int limit) {
+  /// 获取当前词书中未学习的单词，按 seq 排序，限制数量。
+  ///
+  /// [excludeTexts] 为需要在其他词书已掌握（stage=99）的单词文本，跨书
+  /// 迁移时用于跳过相同文本的单词，避免重复学习。
+  Future<List<Word>> getNewWords(
+    String book,
+    int limit, {
+    Set<String> excludeTexts = const {},
+  }) {
     final progressSubquery = selectOnly(progress)
       ..addColumns([progress.wordId]);
     progressSubquery.where(progress.book.equals(book));
 
-    return (select(words)
-          ..where(
-            (t) => t.book.equals(book) & t.id.isNotInQuery(progressSubquery),
-          )
+    final query = select(words)
+      ..where(
+        (t) => t.book.equals(book) & t.id.isNotInQuery(progressSubquery),
+      );
+    if (excludeTexts.isNotEmpty) {
+      query.where((t) => t.word.isNotIn(excludeTexts.toList()));
+    }
+    return (query
           ..orderBy([(t) => OrderingTerm(expression: t.seq)])
           ..limit(limit))
         .get();
@@ -165,6 +176,54 @@ class AppDatabase extends _$AppDatabase {
           }
           return result;
         });
+  }
+
+  /// 获取指定词书中已掌握（stage=99）单词的**文本**集合。
+  ///
+  /// 用于跨书迁移：切换到另一本书时，通过相同文本跳过这些词，避免重复学习。
+  Future<Set<String>> getMasteredWordTexts(String book) {
+    return (select(words).join([
+      innerJoin(progress, progress.wordId.equalsExp(words.id)),
+    ])
+          ..where(words.book.equals(book) & progress.stage.equals(99)))
+        .map((row) => row.readTable(words).word)
+        .get()
+        .then((rows) => rows.toSet());
+  }
+
+  /// 待复习单词候选（join 生词本加入时间与复习阶段）。
+  ///
+  /// 返回当前词书中 `nextReviewAt < 今日末` 且 `stage != 99` 的单词，附带
+  /// 生词本加入时间（可能为 null）与当前复习阶段，供自出卷按优先级排序。
+  Future<List<ReviewCandidate>> getReviewCandidates(
+    String book,
+    DateTime today,
+  ) {
+    final cutoff = DateTime(today.year, today.month, today.day + 1);
+    final notebookJoined = leftOuterJoin(
+      notebook,
+      notebook.wordId.equalsExp(words.id),
+    );
+    final query = select(words).join([
+      innerJoin(progress, progress.wordId.equalsExp(words.id)),
+      notebookJoined,
+    ])
+      ..where(
+        words.book.equals(book) &
+            progress.nextReviewAt.isSmallerThanValue(cutoff) &
+            progress.stage.isNotValue(99),
+      );
+
+    return query.map((row) {
+      final word = row.readTable(words);
+      final progressRow = row.readTable(progress);
+      final notebookRow = row.readTableOrNull(notebook);
+      return ReviewCandidate(
+        word: word,
+        notebookAddedAt: notebookRow?.addedAt,
+        stage: progressRow.stage,
+      );
+    }).get();
   }
 
   /// 根据 ID 获取单词
@@ -329,6 +388,23 @@ class NotebookWord {
     required this.word,
     required this.addedAt,
     required this.source,
+  });
+}
+
+/// 待复习单词候选（join 生词本与复习阶段的结果）
+class ReviewCandidate {
+  final Word word;
+
+  /// 生词本加入时间；不在生词本时为 null
+  final DateTime? notebookAddedAt;
+
+  /// 当前复习阶段（1/3/7/15）
+  final int stage;
+
+  ReviewCandidate({
+    required this.word,
+    required this.notebookAddedAt,
+    required this.stage,
   });
 }
 

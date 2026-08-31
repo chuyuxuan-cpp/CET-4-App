@@ -135,6 +135,15 @@ class StudyNotifier extends Notifier<StudyState> {
     return await db.getSetting('active_book') ?? 'cet4';
   }
 
+  /// 另一本书已掌握（stage=99）的单词文本，用于跨书迁移跳过重复学习。
+  Future<Set<String>> _readOtherBookMasteredTexts(
+    AppDatabase db,
+    String book,
+  ) async {
+    final otherBook = book == 'cet4' ? 'cet6' : 'cet4';
+    return db.getMasteredWordTexts(otherBook);
+  }
+
   DateTime get _today => DateTime.now();
 
   DateTime get _tomorrow {
@@ -164,7 +173,10 @@ class StudyNotifier extends Notifier<StudyState> {
 
       final remaining = quota - todayCount;
       if (remaining <= 0) {
-        final hasMoreNewWords = (await db.getNewWords(book, 1)).isNotEmpty;
+        final excludeTexts = await _readOtherBookMasteredTexts(db, book);
+        final hasMoreNewWords =
+            (await db.getNewWords(book, 1, excludeTexts: excludeTexts))
+                .isNotEmpty;
         state = state.copyWith(
           words: [],
           currentIndex: 0,
@@ -177,7 +189,12 @@ class StudyNotifier extends Notifier<StudyState> {
         return;
       }
 
-      final newWords = await db.getNewWords(book, remaining);
+      final excludeTexts = await _readOtherBookMasteredTexts(db, book);
+      final newWords = await db.getNewWords(
+        book,
+        remaining,
+        excludeTexts: excludeTexts,
+      );
 
       state = state.copyWith(
         words: newWords,
@@ -205,7 +222,8 @@ class StudyNotifier extends Notifier<StudyState> {
     try {
       final db = await _db;
       final book = await _readBook(db);
-      final extra = await db.getNewWords(book, 10);
+      final excludeTexts = await _readOtherBookMasteredTexts(db, book);
+      final extra = await db.getNewWords(book, 10, excludeTexts: excludeTexts);
       state = state.copyWith(
         words: extra,
         currentIndex: 0,

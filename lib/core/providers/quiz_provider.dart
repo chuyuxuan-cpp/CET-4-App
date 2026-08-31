@@ -108,8 +108,8 @@ class QuizState {
 // Notifier
 // ============================================================
 
-/// 复习阶段递进表
-const _stageProgression = <int, int>{1: 3, 3: 7, 7: 99};
+/// 复习阶段递进表：1→3→7→15 天；15 天后再答对即视为掌握（99 哨兵）
+const _stageProgression = <int, int>{1: 3, 3: 7, 7: 15, 15: 99};
 
 /// 单日自出卷题量上限，避免单日复习计划过重
 const _maxDailyQuestions = 120;
@@ -136,26 +136,62 @@ class QuizNotifier extends StateNotifier<QuizState> {
       final book = await db.getSetting('active_book') ?? 'cet4';
       final today = DateTime.now();
 
-      // 2. 获取待复习的单词 ID
-      final wordIds = await db.getReviewWordIds(book, today);
+      // 2. 跨书迁移：另一本书已掌握（stage=99）的相同单词不再复习
+      final otherBook = book == 'cet4' ? 'cet6' : 'cet4';
+      final masteredTexts = await db.getMasteredWordTexts(otherBook);
 
-      if (wordIds.isEmpty) {
+      // 3. 获取待复习候选（含生词本加入时间与阶段）
+      final candidates = await db.getReviewCandidates(book, today);
+
+      final filtered = candidates
+          .where((c) => !masteredTexts.contains(c.word.word))
+          .toList();
+
+      if (filtered.isEmpty) {
         state = state.copyWith(isLoading: false, book: book);
         return;
       }
 
-      // 3. 加载单词详情和当前复习阶段（题量封顶，避免单日计划过重）
-      final words = await db.getReviewWords(wordIds);
-      final stages = await db.getReviewStages(book, wordIds);
+      // 4. 优先级排序：生词本最近 3 天 > 最近 7 天 > 其他（含非生词本）
+      //    单日 120 题先取高优先级，不足再向下补充。
+      final now = DateTime.now();
+      final threeDaysAgo = now.subtract(const Duration(days: 3));
+      final sevenDaysAgo = now.subtract(const Duration(days: 7));
 
-      // 单日自出卷最多 120 题，超出部分留待后续复习
-      final cappedWords = words.take(_maxDailyQuestions).toList();
+      int priority(ReviewCandidate c) {
+        final added = c.notebookAddedAt;
+        if (added != null && added.isAfter(threeDaysAgo)) return 0;
+        if (added != null && added.isAfter(sevenDaysAgo)) return 1;
+        return 2;
+      }
 
-      // 4. 为每个单词生成题目
+      filtered.sort((a, b) {
+        final pa = priority(a);
+        final pb = priority(b);
+        if (pa != pb) return pa.compareTo(pb);
+        // 同优先级内：生词本加入时间更近者优先；非生词本单词殿后
+        final ta = a.notebookAddedAt;
+        final tb = b.notebookAddedAt;
+        if (ta != null && tb != null) return tb.compareTo(ta);
+        if (ta != null) return -1;
+        if (tb != null) return 1;
+        return 0;
+      });
+
+      // 5. 单日自出卷最多 120 题，超出部分留待后续复习
+      final capped = filtered.take(_maxDailyQuestions).toList();
+
+      // 构建阶段映射（仅覆盖进入题目的单词）
+      final stages = <int, int>{
+        for (final c in capped) c.word.id: c.stage,
+      };
+
+      // 6. 为每个单词生成题目
       final random = Random();
       final questions = <QuizQuestion>[];
 
-      for (final word in cappedWords) {
+      for (final c in capped) {
+        final word = c.word;
         final isEn2Cn = random.nextBool();
 
         if (isEn2Cn) {
@@ -165,7 +201,7 @@ class QuizNotifier extends StateNotifier<QuizState> {
         }
       }
 
-      // 5. 打乱题目顺序
+      // 7. 打乱题目顺序
       questions.shuffle(random);
 
       state = QuizState(

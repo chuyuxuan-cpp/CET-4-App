@@ -10,7 +10,7 @@ import 'package:cet4_app/features/quiz/widgets/quiz_option_button.dart';
 
 /// 自出卷页面
 ///
-/// 按 1→3→7→99 间隔自动出题复习，题型包含英译中（四选一）和中译英（填空）
+/// 按 1→3→7→15 间隔自动出题复习，题型包含英译中（四选一）和中译英（填空）
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({super.key});
 

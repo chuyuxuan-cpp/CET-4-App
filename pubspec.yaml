@@ -1,7 +1,7 @@
 name: cet4_app
 description: "CET-4/6 Vocabulary Learning App"
 publish_to: 'none'
-version: 1.4.0+10
+version: 1.5.0+11
 
 environment:
   sdk: ^3.12.2
